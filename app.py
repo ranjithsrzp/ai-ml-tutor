@@ -1,39 +1,68 @@
 import streamlit as st
 import google.generativeai as genai
+import time
 
-st.set_page_config(page_title="AI/ML Tutor", layout="centered")
+# 1. Page Configuration
+st.set_page_config(page_title="AI/ML Interactive Tutor", layout="wide")
 st.title("🎓 My Interactive ML Tutor")
 
-# Sidebar for the Google API Key
+# 2. Sidebar for API Key and Reset
 with st.sidebar:
-    st.header("Setup")
+    st.header("Settings")
     api_key = st.text_input("Enter Google AI Key", type="password")
     st.info("Get a free key at aistudio.google.com")
+    
+    if st.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
 
+# 3. Initialize the Gemini Brain
 if api_key:
-    # Initialize the Gemini Brain
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    try:
+        genai.configure(api_key=api_key)
+        # Using 'gemini-1.5-flash' for higher free-tier limits
+        model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        st.error(f"Configuration Error: {e}")
 
-    # Session state keeps the chat history alive
+    # Initialize Session State for Chat
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Display the conversation
+    # Display Conversation History
     for msg in st.session_state.messages:
-        st.chat_message(msg["role"]).write(msg["content"])
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    # User input box
-    if prompt := st.chat_input("Ask me anything about AI or Machine Learning!"):
+    # 4. Chat Input and AI Logic
+    if prompt := st.chat_input("Ask me about AI/ML! (e.g., What is Gradient Descent?)"):
+        # Add user message to history
         st.session_state.messages.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-        # Send to AI and get a response
-        with st.spinner("Tutor is thinking..."):
-            response = model.generate_content(f"You are a patient ML tutor. Explain simply and provide a Python code snippet: {prompt}")
-            answer = response.text
-        
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-        st.chat_message("assistant").write(answer)
+        # Generate Response with Error Handling
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            try:
+                with st.spinner("Tutor is thinking..."):
+                    # System instruction tells the AI HOW to behave
+                    full_prompt = f"You are a patient, expert ML tutor. Explain this concept simply using analogies and always provide a short, clean Python code snippet: {prompt}"
+                    response = model.generate_content(full_prompt)
+                    
+                    answer = response.text
+                    message_placeholder.markdown(answer)
+                    
+                    # Add assistant message to history
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+            
+            except Exception as e:
+                # Specific check for Rate Limits (The error you saw)
+                if "429" in str(e) or "ResourceExhausted" in str(e):
+                    st.error("🚦 **Rate Limit Reached.** The free tier allows a few questions per minute. Please wait 60 seconds and try again.")
+                elif "404" in str(e):
+                    st.error("🔍 **Model Not Found.** Please check your model name or API key permissions.")
+                else:
+                    st.error(f"⚠️ An error occurred: {e}")
 else:
-    st.warning("👈 Please enter your Google API key in the sidebar to start learning!")
+    st.warning("👈 Please enter your Google API key in the sidebar to start your lesson!")
