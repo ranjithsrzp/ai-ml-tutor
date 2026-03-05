@@ -18,7 +18,7 @@ if api_key:
         
         # FIX: We use 'gemini-pro' or 'gemini-1.5-flash' WITHOUT extra tags
         # These are the most universally accepted names in the Google API
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         if "messages" not in st.session_state:
             st.session_state.messages = []
